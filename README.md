@@ -155,35 +155,63 @@ Press **q** to quit.
 
 ## Method Overview
 
+Event cameras do not capture full frames at fixed intervals. They asynchronously report pixel-level brightness changes as **events** `(x, y, polarity, t)`. Given a previous intensity frame and the events that follow, PIE-Net reconstructs the next frame using **Probabilistic Intensity-Event Mapping (PIEM)**.
+
+```text
+Previous frame + Event stream  →  PIE-Net  →  Reconstructed next frame + uncertainty
+```
+
+### Core idea
+
+Events describe intensity changes: positive events mean brightness increased, negative events mean it decreased. By accumulating polarity-weighted events over time, we estimate how much each pixel's intensity has changed.
+
+Real event data is noisy — thresholds vary across pixels and some events are unreliable. PIEM therefore models intensity change **probabilistically**, estimating both the reconstructed image and a per-pixel uncertainty map.
+
 ### Probabilistic Intensity-Event Mapping (PIEM)
 
-PIE-Net formulates reconstruction as probabilistic inference:
+PIEM links events to frame reconstruction in three steps:
 
-1. **Event → log-intensity** — polarity-weighted events map to log-intensity changes
-2. **Uncertainty propagation** — analytical pixel-wise variance from event noise
-3. **Closed-form reconstruction** — prior intensity + predicted change → frame + confidence
+1. **Accumulate events** — count positive and negative events per pixel to estimate log-intensity change
+2. **Model uncertainty** — treat event counts and thresholds as uncertain, yielding a latent change variable `Z` with mean `μZ` and variance `σZ²`
+3. **Reconstruct the next frame** — apply the probabilistic intensity change to the previous (or refined) frame:
 
-### Architecture
+```text
+next frame ≈ previous frame × event-based intensity change
+```
+
+### PIE-Net architecture
+
+PIE-Net estimates the probabilistic variables required by PIEM. It has two main parts:
+
+**Probabilistic Event Priors Estimator (PEPE)** — a dual-branch encoder that takes a voxel-grid event tensor and the previous intensity frame, fuses motion/change and appearance features, and outputs `μZ`, `σZ²`, and a refined previous-frame representation.
+
+**Probabilistic Intensity-Event Mapper** — applies PIEM to map `μZ`, `σZ²`, and the refined frame to the final reconstruction.
 
 ```
-Event Voxel Grid [B, 5, H, W]
+Event Voxel Grid [B, 5, H, W]  +  Previous Frame [B, 1, H, W]
         ↓
-   Dual Stem (Event + Intensity)
-        ↓
-   Recurrent Encoder + MCSE (modality-conditioned FiLM)
+   Dual Stem (Event + Intensity)  →  Recurrent Encoder + MCSE
         ↓
    Decoder + UGSG (uncertainty-guided skip gating)
         ↓
-   PIEM Head
-        ↓
-Output: Mean Intensity [B, 1, H, W]  +  Variance [B, 1, H, W]
+   PIEM Head  →  Mean Intensity [B, 1, H, W]  +  Variance [B, 1, H, W]
 ```
 
 Key components:
 
 - **MCSE** — Modality-Conditioned Shared Encoder adapts to event vs. frame reliability
 - **UGSG** — Uncertainty-Guided Skip Gating routes features by predicted confidence
-- **PUAR loss** — Probabilistic Uncertainty-Aware Reconstruction during training
+- **PUAR loss** — Probabilistic Uncertainty-Aware Reconstruction penalizes confident wrong predictions more strongly than uncertain ones
+
+### Pipeline summary
+
+```text
+1. Encode asynchronous events as voxel grids
+2. Combine event data with the previous intensity frame
+3. Estimate probabilistic intensity-change priors (PEPE)
+4. Reconstruct the next frame via PIEM
+5. Train with an uncertainty-aware reconstruction loss (PUAR)
+```
 
 ---
 
