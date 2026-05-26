@@ -6,7 +6,7 @@ Ships two pretrained variants:
   - PIE-Net-Lite — 2× faster, half the parameters
 """
 
-__version__ = "1.1.2"
+__version__ = "1.1.3"
 __author__ = "Vincent Qu"
 
 from .model import (
