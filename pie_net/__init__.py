@@ -6,7 +6,7 @@ Ships two pretrained variants:
   - PIE-Net-Lite — 2× faster, half the parameters
 """
 
-__version__ = "1.1.0"
+__version__ = "1.1.2"
 __author__ = "Vincent Qu"
 
 from .model import (
@@ -17,6 +17,7 @@ from .model import (
     count_parameters,
     list_variants,
     resolve_variant,
+    stack_piem_representation,
 )
 
 __all__ = [
@@ -27,5 +28,6 @@ __all__ = [
     "count_parameters",
     "list_variants",
     "resolve_variant",
+    "stack_piem_representation",
     "__version__",
 ]

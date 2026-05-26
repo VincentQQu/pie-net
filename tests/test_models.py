@@ -12,6 +12,7 @@ from pie_net import (
     load_model,
     load_model_lite,
     resolve_variant,
+    stack_piem_representation,
 )
 
 
@@ -48,6 +49,10 @@ class TestModelLoading(unittest.TestCase):
                 out = model(events)
             self.assertEqual(out["image"].shape, (1, 1, 64, 64))
             self.assertEqual(out["var"].shape, (1, 1, 64, 64))
+            for key in ("mean_exp_z", "var_exp_z", "k", "mean_f1", "var_f1"):
+                self.assertEqual(out[key].shape, (1, 1, 64, 64))
+            rep = stack_piem_representation(out)
+            self.assertEqual(rep.shape, (1, 5, 64, 64))
             model.reset_states()
             self.assertIsNone(model.f0)
 

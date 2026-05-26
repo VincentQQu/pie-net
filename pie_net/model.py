@@ -468,7 +468,16 @@ class PIENet(nn.Module):
         self.p_states = [(h.detach(), c.detach()) for h, c in new_p_states]
         self.prev_var = var_f1.detach()
 
-        return {"image": mean_f1, "var": var_f1}
+        return {
+            "mean_exp_z": mean_exp_z,
+            "var_exp_z": var_exp_z,
+            "k": k,
+            "mean_f1": mean_f1,
+            "var_f1": var_f1,
+            # Backward-compatible aliases for reconstruction demos / EVREAL
+            "image": mean_f1,
+            "var": var_f1,
+        }
 
     def reset_states(self):
         """Reset internal streaming states. Call between sequences."""
@@ -538,6 +547,29 @@ def load_model_lite(
 ) -> PIENetLite:
     """Convenience loader for PIE-Net-Lite."""
     return load_model(pretrained=pretrained, device=device, variant="pie-net-lite")  # type: ignore[return-value]
+
+
+def stack_piem_representation(output: dict) -> torch.Tensor:
+    """
+    Stack PIEM latent maps into a 5-channel event representation [B, 5, H, W].
+
+    Channels (in order):
+        0: mean_exp_z — expected log-intensity change (Z mean)
+        1: var_exp_z  — uncertainty of Z
+        2: k          — learned PIEM scaling parameter
+        3: mean_f1    — reconstructed intensity frame
+        4: var_f1     — per-pixel frame uncertainty
+    """
+    return torch.cat(
+        [
+            output["mean_exp_z"],
+            output["var_exp_z"],
+            output["k"],
+            output["mean_f1"],
+            output["var_f1"],
+        ],
+        dim=1,
+    )
 
 
 def count_parameters(model: nn.Module) -> int:
